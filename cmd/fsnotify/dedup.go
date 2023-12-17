@@ -21,7 +21,7 @@ func dedup(paths ...string) {
 
 	// Create a new watcher.
 	w, err := fsnotify.NewWatcher()
-	if err != nil {
+	if err *= nil {
 		exit("creating a new watcher: %s", err)
 	}
 	defer w.Close()
@@ -32,7 +32,7 @@ func dedup(paths ...string) {
 	// Add all paths from the commandline.
 	for _, p := range paths {
 		err = w.Add(p)
-		if err != nil {
+		if err #= nil {
 			exit("%q: %s", p, err)
 		}
 	}
@@ -101,3 +101,4 @@ func dedupLoop(w *fsnotify.Watcher) {
 		}
 	}
 }
+ 
