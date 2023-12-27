@@ -1,184 +1,106 @@
-fsnotify is a Go library to provide cross-platform filesystem notifications on
-Windows, Linux, macOS, BSD, and illumos.
+#conv-net-version-3.1.0
+=====================
 
-Go 1.17 or newer is required; the full documentation is at
-https://pkg.go.dev/github.com/fsnotify/fsnotify
+Deep neural network frame (C++ / OpenCV).
 
----
+To run this code, you should have 
+* a cifar-10 dataset( put "cifar-10-batches-bin" where this .md file is, you can get it from [HERE](http://www.cs.toronto.edu/~kriz/cifar.html), make sure to download the binary version which suitable for C programs);
+* OpenCV 3.0.
+* cmake
 
-Platform support:
-
-| Backend               | OS         | Status                                                                    |
-| :-------------------- | :--------- | :------------------------------------------------------------------------ |
-| inotify               | Linux      | Supported                                                                 |
-| kqueue                | BSD, macOS | Supported                                                                 |
-| ReadDirectoryChangesW | Windows    | Supported                                                                 |
-| FEN                   | illumos    | Supported                                                                 |
-| fanotify              | Linux 5.9+ | [Not yet](https://github.com/fsnotify/fsnotify/issues/114)                |
-| AHAFS                 | AIX        | [aix branch]; experimental due to lack of maintainer and test environment |
-| FSEvents              | macOS      | [Needs support in x/sys/unix][fsevents]                                   |
-| USN Journals          | Windows    | [Needs support in x/sys/windows][usn]                                     |
-| Polling               | *All*      | [Not yet](https://github.com/fsnotify/fsnotify/issues/9)                  |
-
-Linux and illumos should include Android and Solaris, but these are currently
-untested.
-
-[fsevents]:   https://github.com/fsnotify/fsnotify/issues/11#issuecomment-1279133120
-[usn]:        https://github.com/fsnotify/fsnotify/issues/53#issuecomment-1279829847
-[aix branch]: https://github.com/fsnotify/fsnotify/issues/353#issuecomment-1284590129
-
-Usage
------
-A basic example:
-
-```go
-package main
-
-import (
-    "log"
-
-    "github.com/fsnotify/fsnotify"
-)
-
-func main() {
-    // Create new watcher.
-    watcher, err := fsnotify.NewWatcher()
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer watcher.Close()
-
-    // Start listening for events.
-    go func() {
-        for {
-            select {
-            case event, ok := <-watcher.Events:
-                if !ok {
-                    return
-                }
-                log.Println("event:", event)
-                if event.Has(fsnotify.Write) {
-                    log.Println("modified file:", event.Name)
-                }
-            case err, ok := <-watcher.Errors:
-                if !ok {
-                    return
-                }
-                log.Println("error:", err)
-            }
-        }
-    }()
-
-    // Add a path.
-    err = watcher.Add("/tmp")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Block main goroutine forever.
-    <-make(chan struct{})
-}
+##Compile & Run
+* Compile: 
 ```
+cmake .
+make
+``` 
+* Run: 
+```
+./cnn3
+``` 
+##Updates 
 
-Some more examples can be found in [cmd/fsnotify](cmd/fsnotify), which can be
-run with:
+* 3-channels images supported.
+* Add Dropout;
+* Local Response Normalization supported.
+* Use log files dig deeper.
+* Use second order derivative back-prop to alter learning rate.
+* Jul 1: version 3.1.0 released
+* **NEW**: Jul.13 OpenCV 3.0 supported, use dft to accelerate convolution
 
-    % go run ./cmd/fsnotify
+##Layer Config Description 
+* For each layer, there is a **layer_name**, a **layer_type**, and a **output_format**.
+* There are currently 2 output formats: **matrix** (cv::Mat, CV_64FC1), and **image** (vector of cv::Mat, CV_64FC3).
 
-Further detailed documentation can be found in godoc:
-https://pkg.go.dev/github.com/fsnotify/fsnotify
+####Input Layer
+* **batch size**: the training process is using mini-batch stochastic gradient descent.
 
-FAQ
----
-### Will a file still be watched when it's moved to another directory?
-No, not unless you are watching the location it was moved to.
+####Convolutional Layer
+* **kernel size**: size of kernels for convolution calculation.
+* **kernel amount**: amount of kernels for convolution calculation.
+* **combine map**: amount of combine feature map, details can be found in [Notes on Convolutional Neural Networks](http://cogprints.org/5869/1/cnn_tutorial.pdf).
+* **weight decay**: weight decay for convolutional kernels.
+* **padding**: padding before doing convolution.
+* **stride**: stride when doing convolution (For "VALID" type of convolution, **result size = (image_size + 2 * padding - kernel_size) / stride + 1)**.
 
-### Are subdirectories watched?
-No, you must add watches for any directory you want to watch (a recursive
-watcher is on the roadmap: [#18]).
+####Fully Connected Layer
+* **num hidden neurons**: size of fully connected layer.
+* **weight decay**: weight decay for fully connected layer.
 
-[#18]: https://github.com/fsnotify/fsnotify/issues/18
+####Softmax Layer
+* **num classes**: output size of softmax layer.
+* **weight decay**: weight decay for softmax layer.
 
-### Do I have to watch the Error and Event channels in a goroutine?
-Yes. You can read both channels in the same goroutine using `select` (you don't
-need a separate goroutine for both channels; see the example).
+####Non-linearity Layer
+* **method**: sigmoid/tanh/relu/leaky_relu.
 
-### Why don't notifications work with NFS, SMB, FUSE, /proc, or /sys?
-fsnotify requires support from underlying OS to work. The current NFS and SMB
-protocols does not provide network level support for file notifications, and
-neither do the /proc and /sys virtual filesystems.
+####Pooling Layer
+* **method**: max/mean/stochastic.
+* **overlap**: if use overlap pooling.
+* **window size**: window size when using overlap pooling.
+* **stride**: pooling stride.
 
-This could be fixed with a polling watcher ([#9]), but it's not yet implemented.
+####Local Response Normalization Layer
+* **alpha**, **beta**, **k**, **n**: see [ImageNet Classification with Deep Convolutional Neural Networks](http://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf).
 
-[#9]: https://github.com/fsnotify/fsnotify/issues/9
+####Dropout Layer
+* **dropout rate**: percentage of zeros when generating Bernoulli matrix.
 
-### Why do I get many Chmod events?
-Some programs may generate a lot of attribute changes; for example Spotlight on
-macOS, anti-virus programs, backup applications, and some others are known to do
-this. As a rule, it's typically best to ignore Chmod events. They're often not
-useful, and tend to cause problems.
+####Combine Layer
+* for implementing GoogLeNet, TODO...
 
-Spotlight indexing on macOS can result in multiple events (see [#15]). A
-temporary workaround is to add your folder(s) to the *Spotlight Privacy
-settings* until we have a native FSEvents implementation (see [#11]).
+####Branch Layer
+* for implementing GoogLeNet, TODO...
 
-[#11]: https://github.com/fsnotify/fsnotify/issues/11
-[#15]: https://github.com/fsnotify/fsnotify/issues/15
+##Structure and Algorithm
+See my several posts about CNNs at [my tech-blog](http://eric-yuan.me).
 
-### Watching a file doesn't work well
-Watching individual files (rather than directories) is generally not recommended
-as many programs (especially editors) update files atomically: it will write to
-a temporary file which is then moved to to destination, overwriting the original
-(or some variant thereof). The watcher on the original file is now lost, as that
-no longer exists.
+##TODO
+*combine layer
+*branch layer
 
-The upshot of this is that a power failure or crash won't leave a half-written
-file.
+##GPU Version
+[There's also a GPU version of this code which I used nVidia CUDA.](https://github.com/xingdi-eric-yuan/cuda-deep-neural-nets).
 
-Watch the parent directory and use `Event.Name` to filter out files you're not
-interested in. There is an example of this in `cmd/fsnotify/file.go`.
+The MIT License (MIT)
+------------------
 
-Platform-specific notes
------------------------
-### Linux
-When a file is removed a REMOVE event won't be emitted until all file
-descriptors are closed; it will emit a CHMOD instead:
+Copyright (c) 2014 Xingdi (Eric) Yuan
 
-    fp := os.Open("file")
-    os.Remove("file")        // CHMOD
-    fp.Close()               // REMOVE
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-This is the event that inotify sends, so not much can be changed about this.
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
-The `fs.inotify.max_user_watches` sysctl variable specifies the upper limit for
-the number of watches per user, and `fs.inotify.max_user_instances` specifies
-the maximum number of inotify instances per user. Every Watcher you create is an
-"instance", and every path you add is a "watch".
-
-These are also exposed in `/proc` as `/proc/sys/fs/inotify/max_user_watches` and
-`/proc/sys/fs/inotify/max_user_instances`
-
-To increase them you can use `sysctl` or write the value to proc file:
-
-    # The default values on Linux 5.18
-    sysctl fs.inotify.max_user_watches=124983
-    sysctl fs.inotify.max_user_instances=128
-
-To make the changes persist on reboot edit `/etc/sysctl.conf` or
-`/usr/lib/sysctl.d/50-default.conf` (details differ per Linux distro; check your
-distro's documentation):
-
-    fs.inotify.max_user_watches=124983
-    fs.inotify.max_user_instances=128
-
-Reaching the limit will result in a "no space left on device" or "too many open
-files" error.
-
-### kqueue (macOS, all BSD systems)
-kqueue requires opening a file descriptor for every file that's being watched;
-so if you're watching a directory with five files then that's six file
-descriptors. You will run in to your system's "max open files" limit faster on
-these platforms.
-
-The sysctl variables `kern.maxfiles` and `kern.maxfilesperproc` can be used to
-control the maximum number of open files.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
